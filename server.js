@@ -4,34 +4,48 @@ const { spawn } = require("child_process");
 const app = express();
 app.use(express.json());
 
+// ---- MCP PROCESS (singleton) ----
+console.log("Starting MCP server...");
+const mcp = spawn("mcp-server-playwright", [], {
+  stdio: ["pipe", "pipe", "pipe"],
+});
+
+mcp.stderr.on("data", d => {
+  console.error("[MCP stderr]", d.toString());
+});
+
+let buffer = "";
+
+// MCP output handler
+mcp.stdout.on("data", d => {
+  buffer += d.toString();
+});
+
+// ---- HTTP ----
 app.get("/", (_req, res) => {
   res.send("OK");
 });
 
 app.post("/mcp", (req, res) => {
-  const child = spawn("mcp-server-playwright", [], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const payload = JSON.stringify(req.body);
 
-  child.stdin.write(JSON.stringify(req.body));
-  child.stdin.end();
+  // write MCP request
+  mcp.stdin.write(payload + "\n");
 
-  let output = "";
-  let error = "";
-
-  child.stdout.on("data", d => output += d.toString());
-  child.stderr.on("data", d => error += d.toString());
-
-  child.on("close", () => {
-    if (error) {
-      return res.status(500).json({ error });
+  // poll until we get a JSON-RPC response
+  const interval = setInterval(() => {
+    const idx = buffer.indexOf("\n");
+    if (idx !== -1) {
+      const message = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 1);
+      clearInterval(interval);
+      try {
+        res.json(JSON.parse(message));
+      } catch {
+        res.type("application/json").send(message);
+      }
     }
-    try {
-      res.json(JSON.parse(output));
-    } catch {
-      res.type("application/json").send(output);
-    }
-  });
+  }, 10);
 });
 
 const port = process.env.PORT || 8080;
