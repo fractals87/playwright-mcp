@@ -4,14 +4,12 @@ const { spawn } = require("child_process");
 const app = express();
 app.use(express.json());
 
-// health check
 app.get("/", (_req, res) => {
   res.send("OK");
 });
 
-// MCP bridge
 app.post("/mcp", (req, res) => {
-  const child = spawn("npx", ["mcp-server-playwright"], {
+  const child = spawn("mcp-server-playwright", [], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -21,8 +19,8 @@ app.post("/mcp", (req, res) => {
   let output = "";
   let error = "";
 
-  child.stdout.on("data", (d) => (output += d.toString()));
-  child.stderr.on("data", (d) => (error += d.toString()));
+  child.stdout.on("data", d => output += d.toString());
+  child.stderr.on("data", d => error += d.toString());
 
   child.on("close", () => {
     if (error) {
