@@ -7,12 +7,10 @@ WORKDIR /app
 COPY . .
 
 
-# installa deps e registra il bin
 RUN npm install
-RUN npm install -g .
 
 
 EXPOSE 8080
 
 
-CMD ["mcp-server-playwright"]
+CMD ["node", "cli.js"]
